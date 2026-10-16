@@ -18,7 +18,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IPartyList PartyList { get; private set; } = null!;
-    private const string CommandName = "/pmycommand";
+    private const string CommandName = "/hp";
 
     public Configuration Configuration { get; init; }
 

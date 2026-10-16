@@ -42,7 +42,14 @@ public class MainWindow : Window, IDisposable
 
         foreach (var member in Plugin.PartyList)
         {
-            ImGui.Text(member.Name.TextValue);
+            float hpPercent = member.MaxHP > 0 ? (float)member.CurrentHP / member.MaxHP * 100: 0;
+
+            ImGui.Text($"{member.Name.TextValue}: {member.CurrentHP} / {member.MaxHP} HP ({hpPercent:F1}%)");
+            if (member.CurrentHP > 0 && hpPercent < 30)
+            {
+                ImGui.SameLine();
+                ImGui.Text("LOW HP!");
+            }
         }
     }
 }
