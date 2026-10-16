@@ -5,7 +5,7 @@ using System.IO;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using LowHPNotifier.Windows;
-
+using System.Collections.Generic;
 namespace LowHPNotifier;
 
 public sealed class Plugin : IDalamudPlugin
@@ -18,7 +18,12 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IPartyList PartyList { get; private set; } = null!;
+    [PluginService]
+    internal static IToastGui ToastGui { get; private set; } = null!;
+    [PluginService]
+    internal static IFramework Framework { get; private set; } = null!;
     private const string CommandName = "/hp";
+    private readonly HashSet<string> alertedPlayers = new();
 
     public Configuration Configuration { get; init; }
 
@@ -28,6 +33,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
+        Framework.Update += OnFrameworkUpdate;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         // You might normally want to embed resources and load them from the manifest stream
@@ -73,6 +79,7 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
+        Framework.Update -= OnFrameworkUpdate;
     }
 
     private void OnCommand(string command, string args)
@@ -83,4 +90,51 @@ public sealed class Plugin : IDalamudPlugin
     
     public void ToggleConfigUi() => ConfigWindow.Toggle();
     public void ToggleMainUi() => MainWindow.Toggle();
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        float lowestHP = 100f;
+        float secondLowestHP = 100f;
+        int livingMembers = 0;
+        string lowestHPPlayer = "";
+
+        foreach (var member in PartyList)
+        {
+            if (member.MaxHP == 0 || member.CurrentHP == 0)
+                continue;
+
+            float hpPercent = (float)member.CurrentHP / member.MaxHP * 100f;
+
+            livingMembers++;
+
+            if (hpPercent < lowestHP)
+            {
+                secondLowestHP = lowestHP;
+                lowestHP = hpPercent;
+                lowestHPPlayer = member.Name.TextValue;
+            }
+            else if (hpPercent < secondLowestHP)
+            {
+                secondLowestHP = hpPercent;
+            }
+        }
+
+        bool shouldAlert =
+            livingMembers >= 2 &&
+            lowestHP < Configuration.CriticalHPThreshold &&
+            (secondLowestHP - lowestHP) >= Configuration.HPDifferenceThreshold;
+
+        if (shouldAlert)
+        {
+            if (alertedPlayers.Add(lowestHPPlayer))
+            {
+                ToastGui.ShowNormal(
+                    $"LOW HP: {lowestHPPlayer} ({lowestHP:F1}%)"
+                );
+            }
+        }
+        else
+        {
+            alertedPlayers.Clear();
+        }
+    }
 }

@@ -10,6 +10,9 @@ public class MainWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
 
+    // Prevent repeated notifications while the alert is active
+    private bool hasAlerted = false;
+
     public MainWindow(Plugin plugin, string goatImagePath)
         : base("LowHPNotifier")
     {
@@ -72,13 +75,12 @@ public class MainWindow : Window, IDisposable
                 $"{member.Name.TextValue}: {member.CurrentHP} / {member.MaxHP} HP ({hpPercent:F1}%)"
             );
 
-            // Ignore dead players for low-HP detection
+            // Ignore dead players
             if (member.CurrentHP == 0)
                 continue;
 
             livingMembers++;
 
-            // Track lowest and second-lowest HP
             if (hpPercent < lowestHP)
             {
                 secondLowestHP = lowestHP;
@@ -90,7 +92,7 @@ public class MainWindow : Window, IDisposable
                 secondLowestHP = hpPercent;
             }
 
-            // Basic warning for debugging
+            // Basic low-HP indicator
             if (hpPercent < plugin.Configuration.CriticalHPThreshold)
             {
                 ImGui.SameLine();
@@ -107,18 +109,37 @@ public class MainWindow : Window, IDisposable
             ImGui.Text($"Lowest party HP: {lowestHP:F1}%");
             ImGui.Text($"Second-lowest HP: {secondLowestHP:F1}%");
             ImGui.Text($"HP Difference: {hpDifference:F1} percentage points");
-
-            // Smart low-HP detection
-            if (lowestHP < plugin.Configuration.CriticalHPThreshold &&
-                hpDifference >= plugin.Configuration.HPDifferenceThreshold)
-            {
-                ImGui.Separator();
-                ImGui.Text($"ISOLATED LOW HP DETECTED: {lowestHPPlayer}!");
-            }
         }
         else
         {
             ImGui.Text("Not enough living party members to compare HP.");
         }
+
+        // Smart low-HP detection
+        bool shouldAlert =
+            livingMembers >= 2 &&
+            lowestHP < plugin.Configuration.CriticalHPThreshold &&
+            (secondLowestHP - lowestHP) >= plugin.Configuration.HPDifferenceThreshold;
+
+        if (shouldAlert)
+        {
+            ImGui.Text($"ISOLATED LOW HP DETECTED: {lowestHPPlayer}!");
+
+            // Show toast only once per alert event
+            if (!hasAlerted)
+            {
+                Plugin.ToastGui.ShowNormal(
+                    $"LOW HP: {lowestHPPlayer} ({lowestHP:F1}%)"
+                );
+
+                hasAlerted = true;
+            }
+        }
+        else
+        {
+            // Allow another alert after the condition clears
+            hasAlerted = false;
+        }
     }
+
 }
