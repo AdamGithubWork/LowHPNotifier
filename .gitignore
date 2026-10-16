@@ -1,0 +1,14 @@
+
+.vs/
+*.user
+*.suo
+
+bin/
+obj/
+Debug/
+Release/
+
+.idea/
+
+*.tmp
+*.log
